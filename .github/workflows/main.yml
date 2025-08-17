@@ -1,0 +1,37 @@
+name: Build TouchMux Magisk Module
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+
+      - name: Build touchmux (arm64)
+        run: |
+          mkdir -p bin
+          $ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+            touchmux.c -O2 -s -o bin/touchmux
+
+      - name: Package Magisk module
+        run: |
+          zip -r TouchMux.zip . -x "*.git*"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: TouchMux-magisk
+          path: TouchMux.zip
