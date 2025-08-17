@@ -41,65 +41,44 @@ static void emit(int fd, unsigned short type, unsigned short code, int value){
 static void sync_report(int fd){ emit(fd, EV_SYN, SYN_REPORT, 0); }
 
 static int setup_uinput_from_src(int src, int* max_x, int* max_y){
-  int ui = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-  if (ui < 0) die("open(/dev/uinput)");
+    int ui = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (ui < 0) die("open(/dev/uinput)");
 
-  // Enable event types
-  if (set_ev(ui, EV_KEY) < 0) die("UI_SET_EVBIT KEY");
-  if (set_ev(ui, EV_ABS) < 0) die("UI_SET_EVBIT ABS");
-  if (set_ev(ui, EV_SYN) < 0) die("UI_SET_EVBIT SYN");
+    // Event types
+    set_ev(ui, EV_KEY);
+    set_ev(ui, EV_ABS);
+    set_ev(ui, EV_SYN);
 
-  // Keys commonly used
-  set_key(ui, BTN_TOUCH);
-  set_key(ui, BTN_TOOL_FINGER);
+    // Keys
+    set_key(ui, BTN_TOUCH);
+    set_key(ui, BTN_TOOL_FINGER);
 
-  // Copy ABS axes from source
-  struct input_absinfo ax, ay, pres, mt_x, mt_y, mt_id, mt_slot;
-  int has_mt_slot = (ioctl(src, EVIOCGBIT(EV_ABS, sizeof(long)*8), NULL), 1); // dummy to allow queries
+    // Touchscreen property
+    ioctl(ui, UI_SET_PROPBIT, INPUT_PROP_DIRECT);
 
-  memset(&ax,0,sizeof(ax)); memset(&ay,0,sizeof(ay));
-  memset(&pres,0,sizeof(pres)); memset(&mt_x,0,sizeof(mt_x));
-  memset(&mt_y,0,sizeof(mt_y)); memset(&mt_id,0,sizeof(mt_id));
-  memset(&mt_slot,0,sizeof(mt_slot));
+    struct uinput_user_dev uidev;
+    memset(&uidev,0,sizeof(uidev));
+    snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "touchmux-virtual");
+    uidev.id.bustype = BUS_VIRTUAL;
+    uidev.id.vendor  = 0x18D1; // Google as placeholder
+    uidev.id.product = 0x4EE1;
+    uidev.id.version = 1;
 
-  if (get_abs(src, ABS_X, &ax)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_X); }
-  if (get_abs(src, ABS_Y, &ay)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_Y); }
-  if (get_abs(src, ABS_PRESSURE, &pres)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_PRESSURE); }
-  if (get_abs(src, ABS_MT_POSITION_X, &mt_x)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_MT_POSITION_X); }
-  if (get_abs(src, ABS_MT_POSITION_Y, &mt_y)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_MT_POSITION_Y); }
-  if (get_abs(src, ABS_MT_TRACKING_ID, &mt_id)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_MT_TRACKING_ID); }
-  if (get_abs(src, ABS_MT_SLOT, &mt_slot)==0) { ioctl(ui, UI_SET_ABSBIT, ABS_MT_SLOT); has_mt_slot = 1; } else { has_mt_slot = 0; }
-
-  struct uinput_user_dev uidev;
-  memset(&uidev,0,sizeof(uidev));
-  snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "touchmux-virtual");
-  uidev.id.bustype = BUS_VIRTUAL;
-  uidev.id.vendor  = 0x18D1; // Google as placeholder
-  uidev.id.product = 0x4EE1;
-  uidev.id.version = 1;
-
-  // Set axis ranges
-  if (ax.maximum > ax.minimum && ay.maximum > ay.minimum) {
-    uidev.absmin[ABS_X] = ax.minimum; uidev.absmax[ABS_X] = ax.maximum;
-    uidev.absmin[ABS_Y] = ay.minimum; uidev.absmax[ABS_Y] = ay.maximum;
-    *max_x = ax.maximum; *max_y = ay.maximum;
-  } else {
+    // Axis defaults
     *max_x = 1080; *max_y = 2400;
     uidev.absmin[ABS_X] = 0; uidev.absmax[ABS_X] = *max_x;
     uidev.absmin[ABS_Y] = 0; uidev.absmax[ABS_Y] = *max_y;
-  }
-  if (pres.maximum > pres.minimum) { uidev.absmin[ABS_PRESSURE]=pres.minimum; uidev.absmax[ABS_PRESSURE]=pres.maximum; }
-  if (mt_x.maximum > mt_x.minimum) { uidev.absmin[ABS_MT_POSITION_X]=mt_x.minimum; uidev.absmax[ABS_MT_POSITION_X]=mt_x.maximum; }
-  if (mt_y.maximum > mt_y.minimum) { uidev.absmin[ABS_MT_POSITION_Y]=mt_y.minimum; uidev.absmax[ABS_MT_POSITION_Y]=mt_y.maximum; }
-  if (mt_id.maximum > mt_id.minimum) { uidev.absmin[ABS_MT_TRACKING_ID]=mt_id.minimum; uidev.absmax[ABS_MT_TRACKING_ID]=mt_id.maximum; }
-  if (has_mt_slot && (mt_slot.maximum > mt_slot.minimum)) { uidev.absmin[ABS_MT_SLOT]=mt_slot.minimum; uidev.absmax[ABS_MT_SLOT]=mt_slot.maximum; }
+    uidev.absmin[ABS_MT_POSITION_X] = 0; uidev.absmax[ABS_MT_POSITION_X] = *max_x;
+    uidev.absmin[ABS_MT_POSITION_Y] = 0; uidev.absmax[ABS_MT_POSITION_Y] = *max_y;
+    uidev.absmin[ABS_MT_SLOT] = 0; uidev.absmax[ABS_MT_SLOT] = 9;
+    uidev.absmin[ABS_MT_TRACKING_ID] = 0; uidev.absmax[ABS_MT_TRACKING_ID] = 65535;
 
-  if (write(ui, &uidev, sizeof(uidev)) < 0) die("write(uidev)");
-  if (ioctl(ui, UI_DEV_CREATE) < 0) die("UI_DEV_CREATE");
+    // Write device + create
+    if (write(ui, &uidev, sizeof(uidev)) < 0) die("write(uidev)");
+    if (ioctl(ui, UI_DEV_CREATE) < 0) die("UI_DEV_CREATE");
 
-  // Give the node time to appear
-  usleep(200 * 1000);
-  return ui;
+    usleep(200 * 1000);
+    return ui;
 }
 
 static inline int clamp(int v, int lo, int hi){ if(v<lo) return lo; if(v>hi) return hi; return v; }
