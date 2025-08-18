@@ -18,13 +18,13 @@ jobs:
       - name: Set up Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26d   # latest stable, supports API 34
+          ndk-version: r26d   # latest stable, supports API 33 and 34
 
-      - name: Build TouchMux (arm64, API 34)
+      - name: Build TouchMux (arm64, API 33 - Android 13)
         run: |
           mkdir -p bin
-          $ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang \
-            touchmux-raw.c -O2 -static -o bin/touchmux
+          $ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang \
+            touchmux.c -O2 -static -o bin/touchmux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
