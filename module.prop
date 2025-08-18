@@ -1,6 +1,0 @@
-id=touchmux
-name=Touch Mux (uinput forwarder)
-version=1.0
-versionCode=100
-author=you
-description=Reads real touchscreen events and re-emits them via uinput so you can filter/transform on-device.
