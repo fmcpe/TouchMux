@@ -1,4 +1,0 @@
-allow magisk input_device:chr_file { read open getattr ioctl };
-allow magisk uinput_device:chr_file { create write open getattr ioctl };
-allow magisk device:dir search;
-allow magisk uhid_device:chr_file { open write ioctl getattr };
